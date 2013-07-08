@@ -18,6 +18,8 @@ public:
     static SkyBox *_skybox;
     static Camera *_cam;
 
+    static bool checkShaderCompileStatus(GLuint *shader, std::string sh);
+    static bool checkShaderLinkStatus(GLuint *shader, std::string sh);
 private:
     static void drawTreeStart();
 

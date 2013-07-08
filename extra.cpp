@@ -37,6 +37,51 @@ const GLchar *fragment_shader_src = fragment_shader_glsl;
 const GLchar *vertex_shader_src = vertex_shader_glsl;
 const GLchar *geometry_shader_src = geometry_shader_glsl;
 
+
+bool Extra::checkShaderCompileStatus(GLuint *shader, std::string sh)
+{
+    GLint compiled;
+    glGetObjectParameterivARB(*shader, GL_COMPILE_STATUS, &compiled);
+    if (!compiled)
+    {
+        GLint blen = 0;
+        GLsizei slen = 0;
+        glGetShaderiv(*shader, GL_INFO_LOG_LENGTH , &blen);
+        if (blen > 1){
+            GLchar* compiler_log = (GLchar*)malloc(blen);
+            glGetInfoLogARB(*shader, blen, &slen, compiler_log);
+            std::cout << "Error in " << sh << ", ";
+            std::cout << "compiler_log:\n" << compiler_log;
+            free (compiler_log);
+        }
+        std::cout << std::flush;
+        return false;
+    }
+    return true;
+}
+
+bool Extra::checkShaderLinkStatus(GLuint *shader, std::string sh)
+{
+    GLint compiled;
+    glGetObjectParameterivARB(*shader, GL_LINK_STATUS, &compiled);
+    if (!compiled)
+    {
+        std::cout << "error" << std::endl;
+        GLint blen = 1024;
+        GLsizei slen = 0;
+        GLchar* compiler_log = (GLchar*)malloc(blen);
+        glGetProgramInfoLog(*shader, blen, &slen, compiler_log);
+
+        std::cout << "compiler_log:\n" << compiler_log;
+        free (compiler_log);
+
+        std::cout << std::flush;
+        return false;
+    }
+    return true;
+}
+
+
 /* GLUT display function */
 void Extra::display()
 {
@@ -111,10 +156,22 @@ void Extra::display()
         glShaderSource(geometry_shader, 1, &geometry_shader_src, NULL);
         glCompileShader(geometry_shader);
 
-        /* TODO: use glGetShader() / glGetShaderInfoLog to check for compiler errors */
         _shader = glCreateProgram();
+
+        checkShaderCompileStatus(&fragment_shader, "fragment");
         glAttachShader(_shader, fragment_shader);
+
+        checkShaderCompileStatus(&geometry_shader, "geometry");
+        std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+//        glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
+//        glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+        glAttachShader(_shader, geometry_shader);
+
+        checkShaderCompileStatus(&vertex_shader, "vertex");
+        glAttachShader(_shader, vertex_shader);
+
         glLinkProgram(_shader);
+        checkShaderLinkStatus(&_shader, "kekse");
         /* TODO: use glGetProgram() / glGetProgramInfoLog to check for linker errors */
     }
     glUseProgram(_shader);
