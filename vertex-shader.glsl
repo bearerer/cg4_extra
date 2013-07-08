@@ -1,24 +1,21 @@
-#version 130
+#version 120
 
 /* Variables for lighting */
 uniform vec3 light_position;    // Light position in object space
 
-/* Variables passed to the geometry shader */
+/* Variables passed to the fragment shader */
 varying out vec3 vN;    // Normal in eye space, not normalized
+varying out vec3 vT;    // Tangent in eye space, not normalized
+varying out vec3 vB;    // Bitangent in eye space, not normalized
 varying out vec3 vL;    // Light vector in eye space, not normalized
 varying out vec3 vV;    // View vector in eye space, not normalized
 
-//uniform int layer;
-//uniform int max_layers;
-uniform sampler2D tex;
 void main(void)
 {
     /* Geometry computation. */
-    vec4 position = gl_Vertex;
 
     // Transform the vertex:
-    gl_Position = /*gl_ModelViewProjectionMatrix **/ position;
-    // Do not tranform the vertex here; we do that in the geometry shader!
+    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
 
     /* Lighting computation, in eye space. */
 
@@ -30,6 +27,13 @@ void main(void)
     vec3 light_pos = (gl_ModelViewMatrix * vec4(light_position, 1.0)).xyz;
     // The normal in eye space.
     vN = gl_NormalMatrix * gl_Normal;
+    // The tangent in eye space.
+    // Note: normally these would be precomputed and stored with the model.
+    // This method here is just a hack. For example, it will fail if vN is
+    // approximately parallel to (1 0 0).
+    vT = cross(vN, vec3(1.0, 0.0, 0.0));
+    // The bitangent in eye space.
+    vB = cross(vN, vT);
     // The light vector: from vertex position to light position
     vL = light_pos - pos.xyz;
     // The view vector: from vertex position to eye position

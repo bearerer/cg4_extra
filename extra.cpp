@@ -17,6 +17,7 @@ Camera *Extra::_cam;
 GLuint Extra::_shader;
 bool Extra::_camRotating = false;
 bool Extra::_camZooming = false;
+float Extra::_alpha = 0.f;
 
 /* GLUT state */
 GLboolean glut_stereo = 0;
@@ -85,6 +86,9 @@ bool Extra::checkShaderLinkStatus(GLuint *shader, std::string sh)
 /* GLUT display function */
 void Extra::display()
 {
+
+    _alpha += 0.02f;
+
     static GLuint tex = 0;
     static GLint tex_w = 0, tex_h = 0;
 
@@ -114,12 +118,10 @@ void Extra::display()
     glLoadIdentity();
 //    gluLookAt(eyeX, eyeY, eyeZ, objX, objY, objZ, upX, upY, upZ);
     Extra::_cam->setup();
+
 //    glTranslatef(objX, objY, objZ);
 
     Extra::_skybox->draw(eyeX, eyeY, eyeZ);
-    //glutSolidTeapot(0.5);
-    drawTreeStart();
-
 
     /* Read rendered scene from back buffer into texture */
     if (tex == 0) {
@@ -136,11 +138,11 @@ void Extra::display()
         tex_w = glutGet(GLUT_WINDOW_WIDTH);
         tex_h = glutGet(GLUT_WINDOW_HEIGHT);
     }
-    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0,
-            glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
 
     /* Render texture with fullscreen effect */
     if (_shader == 0) {
+        std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+
         // setup fragment shader:
         GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
@@ -158,21 +160,19 @@ void Extra::display()
 
         _shader = glCreateProgram();
 
-        checkShaderCompileStatus(&fragment_shader, "fragment");
-        glAttachShader(_shader, fragment_shader);
-
-        checkShaderCompileStatus(&geometry_shader, "geometry");
-        std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
-//        glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
-//        glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
-        glAttachShader(_shader, geometry_shader);
-
         checkShaderCompileStatus(&vertex_shader, "vertex");
         glAttachShader(_shader, vertex_shader);
 
+        checkShaderCompileStatus(&fragment_shader, "fragment");
+        glAttachShader(_shader, fragment_shader);
+
+//        checkShaderCompileStatus(&geometry_shader, "geometry");
+//        glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
+//        glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+//        glAttachShader(_shader, geometry_shader);
+
         glLinkProgram(_shader);
         checkShaderLinkStatus(&_shader, "kekse");
-        /* TODO: use glGetProgram() / glGetProgramInfoLog to check for linker errors */
     }
     glUseProgram(_shader);
     glUniform1i(glGetUniformLocation(_shader, "tex"), 0);   /* we only use texture unit 0 */
@@ -181,27 +181,37 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "ks"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "shininess"), 15.0f);
-    glUniform3f(glGetUniformLocation(_shader, "light_position"), -10.0f+10.0f*cos(0), 10.0f, 4.0f+10.0f*sin(0));
+    glUniform3f(glGetUniformLocation(_shader, "light_position"), -10.0f+10.0f*cos(_alpha), 10.0f, 4.0f+10.0f*sin(_alpha));
     glUniform3f(glGetUniformLocation(_shader, "light_color"), 1.0f, 1.0f, 1.0f);
+    glUniform3f(glGetUniformLocation(_shader, "surface_color"), 0.8f, 0.8f, 1.0f);
+    glUniform1i(glGetUniformLocation(_shader, "model"), 0);
+    glUniform1f(glGetUniformLocation(_shader, "r"), 0.2f);
+    glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
+    glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+//    glutSolidTorus(0.1f, 0.5f, 100, 100);
+    drawTreeStart();
 
-    glEnable(GL_TEXTURE_2D);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f);
-    glVertex3f(-1.0f, -1.0f, 0.0f);
-    glTexCoord2f(1.0f, 0.0f);
-    glVertex3f(1.0f, -1.0f, 0.0f);
-    glTexCoord2f(1.0f, 1.0f);
-    glVertex3f(1.0f, 1.0f, 0.0f);
-    glTexCoord2f(0.0f, 1.0f);
-    glVertex3f(-1.0f, 1.0f, 0.0f);
-    glEnd();
-    glDisable(GL_TEXTURE_2D);
+//    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0,
+//            glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
+//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//    glMatrixMode(GL_PROJECTION);
+//    glLoadIdentity();
+//    glMatrixMode(GL_MODELVIEW);
+//    glLoadIdentity();
+
+//    glEnable(GL_TEXTURE_2D);
+//    glBegin(GL_QUADS);
+//    glTexCoord2f(0.0f, 0.0f);
+//    glVertex3f(-1.0f, -1.0f, 0.0f);
+//    glTexCoord2f(1.0f, 0.0f);
+//    glVertex3f(1.0f, -1.0f, 0.0f);
+//    glTexCoord2f(1.0f, 1.0f);
+//    glVertex3f(1.0f, 1.0f, 0.0f);
+//    glTexCoord2f(0.0f, 1.0f);
+//    glVertex3f(-1.0f, 1.0f, 0.0f);
+//    glEnd();
+//    glDisable(GL_TEXTURE_2D);
 
     glUseProgram(0);
 
@@ -307,27 +317,33 @@ void Extra::drawTreeStart()
     float sq = 0.044194174f;
     float l = 0.03125f;
     float n = 0.f;
+    float norm[3];
 
     glDisable(GL_LIGHTING);//TODO remove
     glColor3f(0.5f , 0.25f , 0.08f);
-    glBegin(GL_QUADS);
+    glBegin(GL_TRIANGLES);
+
+//    norm[0] =
 
     glNormal3f(sq2half, n, sq2half);
     glVertex3f(sq, n, -sq);
-    glVertex3f(sq, h, -sq);
-    glVertex3f(n, h, l);
+//    glVertex3f(sq, h, -sq);
+//    glVertex3f(n, h, l);
+    glVertex3f(n, h, n);
     glVertex3f(n, n, l);
 
     glNormal3f(-sq2half, n, sq2half);
     glVertex3f(n, n, l);
-    glVertex3f(n, h, l);
-    glVertex3f(-sq, h, -sq);
+//    glVertex3f(n, h, l);
+//    glVertex3f(-sq, h, -sq);
+    glVertex3f(n, h, n);
     glVertex3f(-sq, n, -sq);
 
     glNormal3f(n, n, -1.f);
     glVertex3f(-sq, n, -sq);
-    glVertex3f(-sq, h, -sq);
-    glVertex3f(sq, h, -sq);
+//    glVertex3f(-sq, h, -sq);
+//    glVertex3f(sq, h, -sq);
+    glVertex3f(n, h, n);
     glVertex3f(sq, n, -sq);
 
     glEnd();

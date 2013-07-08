@@ -17,6 +17,7 @@ public:
 
     static SkyBox *_skybox;
     static Camera *_cam;
+    static float _alpha;
 
     static bool checkShaderCompileStatus(GLuint *shader, std::string sh);
     static bool checkShaderLinkStatus(GLuint *shader, std::string sh);
