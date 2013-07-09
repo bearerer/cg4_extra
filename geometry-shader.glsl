@@ -1,8 +1,6 @@
 #version 120
 #extension GL_EXT_geometry_shader4 : enable
-
-//uniform float base_length;      // for methods 1 and 2
-//uniform vec3 vis_color;         // for methods 0 and 2
+//#extension GL_EXT_gpu_shader4: enable
 
 /* Variables from the vertex shader */
 varying in vec3 vN[];   // Normal in eye space, not normalized
@@ -32,6 +30,11 @@ void main(void)
     emit_vertex(v0, vN[0], vL[0], vV[0]);
     emit_vertex(v1, vN[1], vL[1], vV[1]);
     emit_vertex(v2, vN[2], vL[2], vV[2]);
+    EndPrimitive();
+
+    emit_vertex(v0 + vec4(0.f, 1.f, 0.f, 0.0), vN[0], vL[0], vV[0]);
+    emit_vertex(v0 + vec4(1.f, 1.f, 0.f, 0.0), vN[0], vL[0], vV[0]);
+    emit_vertex(v0 + vec4(0.f, 1.2f, 0.f, 0.0), vN[0], vL[0], vV[0]);
     EndPrimitive();
 
 //    vec4 c = (v0 + v1 + v2) / 3.0;

@@ -1,13 +1,3 @@
-//uniform sampler2D tex;
-//uniform float ripple_offset;
-
-//void main()
-//{
-//    vec2 tc = gl_TexCoord[0].xy;
-//    tc.x += 0.005 * sin(ripple_offset + tc.y * 100.0);
-//    gl_FragColor = vec4(1,0,0,1);//texture2D(tex, tc);
-//}
-
 #version 120
 
 /* Lighting model to use:

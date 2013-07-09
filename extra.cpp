@@ -18,6 +18,7 @@ GLuint Extra::_shader;
 bool Extra::_camRotating = false;
 bool Extra::_camZooming = false;
 float Extra::_alpha = 0.f;
+size_t Extra::_lightModel = 0;
 
 /* GLUT state */
 GLboolean glut_stereo = 0;
@@ -86,7 +87,6 @@ bool Extra::checkShaderLinkStatus(GLuint *shader, std::string sh)
 /* GLUT display function */
 void Extra::display()
 {
-
     _alpha += 0.02f;
 
     static GLuint tex = 0;
@@ -143,40 +143,40 @@ void Extra::display()
     if (_shader == 0) {
         std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
-        // setup fragment shader:
-        GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
-        glCompileShader(fragment_shader);
-
         // setup vertex shader:
         GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
         glCompileShader(vertex_shader);
+        checkShaderCompileStatus(&vertex_shader, "vertex");
 
         // setup geometry shader:
         GLuint geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
         glShaderSource(geometry_shader, 1, &geometry_shader_src, NULL);
         glCompileShader(geometry_shader);
+        checkShaderCompileStatus(&geometry_shader, "geometry");
+
+        // setup fragment shader:
+        GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+        glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
+        glCompileShader(fragment_shader);
+        checkShaderCompileStatus(&fragment_shader, "fragment");
 
         _shader = glCreateProgram();
 
-        checkShaderCompileStatus(&vertex_shader, "vertex");
+        glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT, 8);
+        glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
+        glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+
         glAttachShader(_shader, vertex_shader);
-
-        checkShaderCompileStatus(&fragment_shader, "fragment");
+        glAttachShader(_shader, geometry_shader);
         glAttachShader(_shader, fragment_shader);
-
-//        checkShaderCompileStatus(&geometry_shader, "geometry");
-//        glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
-//        glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
-//        glAttachShader(_shader, geometry_shader);
 
         glLinkProgram(_shader);
         checkShaderLinkStatus(&_shader, "kekse");
     }
     glUseProgram(_shader);
-    glUniform1i(glGetUniformLocation(_shader, "tex"), 0);   /* we only use texture unit 0 */
-    glUniform1f(glGetUniformLocation(_shader, "ripple_offset"), ripple_offset);
+//    glUniform1i(glGetUniformLocation(_shader, "tex"), 0);   /* we only use texture unit 0 */
+//    glUniform1f(glGetUniformLocation(_shader, "ripple_offset"), ripple_offset);
 
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "ks"), 0.8f);
@@ -184,7 +184,7 @@ void Extra::display()
     glUniform3f(glGetUniformLocation(_shader, "light_position"), -10.0f+10.0f*cos(_alpha), 10.0f, 4.0f+10.0f*sin(_alpha));
     glUniform3f(glGetUniformLocation(_shader, "light_color"), 1.0f, 1.0f, 1.0f);
     glUniform3f(glGetUniformLocation(_shader, "surface_color"), 0.8f, 0.8f, 1.0f);
-    glUniform1i(glGetUniformLocation(_shader, "model"), 0);
+    glUniform1i(glGetUniformLocation(_shader, "model"), _lightModel);
     glUniform1f(glGetUniformLocation(_shader, "r"), 0.2f);
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
@@ -251,6 +251,9 @@ void Extra::keyboard(unsigned char key, int x, int y)
     case 27:
     case 'q':
         glutDestroyWindow(glut_window_id);
+        break;
+    case 'l':
+        _lightModel = (_lightModel + 1) % 3;
         break;
     }
 }

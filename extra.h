@@ -26,6 +26,7 @@ private:
 
     static GLuint _shader;
     static bool _camRotating, _camZooming;
+    static size_t _lightModel;
 };
 
 
