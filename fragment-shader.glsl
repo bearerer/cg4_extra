@@ -20,11 +20,17 @@ uniform float a;                // alpha_x
 uniform float b;                // alpha_y
 
 /* Variables from the vertex shader */
-in vec3 gN;    // Normal in eye space, not normalized
 in vec3 vT;    // Tangent in eye space, not normalized
 in vec3 vB;    // Bitangent in eye space, not normalized
+
+in vec3 gN;    // Normal in eye space, not normalized
 in vec3 gL;    // Light vector in eye space, not normalized
 in vec3 gV;    // View vector in eye space, not normalized
+
+//in vec3 vN;    // Normal in eye space, not normalized
+//in vec3 vL;    // Light vector in eye space, not normalized
+//in vec3 vV;    // View vector in eye space, not normalized
+
 
 /* Isotropic Blinn-Phong lighting */
 vec3 blinn_phong(vec3 N, vec3 L, vec3 V, vec3 H)
@@ -87,11 +93,17 @@ vec3 anisotropic_blinn_phong(vec3 N, vec3 T, vec3 B, vec3 L, vec3 V, vec3 H)
 void main(void)
 {
     // Normalize the input from the vertex shader
+
     vec3 N = normalize(gN);
-    vec3 T = normalize(vT);
-    vec3 B = normalize(vB);
     vec3 L = normalize(gL);
     vec3 V = normalize(gV);
+
+//    vec3 N = normalize(vN);
+//    vec3 L = normalize(vL);
+//    vec3 V = normalize(vV);
+
+    vec3 T = normalize(vT);
+    vec3 B = normalize(vB);
     vec3 H = normalize(L + V);
 
     vec3 color;

@@ -139,45 +139,16 @@ void Extra::display()
         tex_h = glutGet(GLUT_WINDOW_HEIGHT);
     }
 
-    /* Render texture with fullscreen effect */
     if (_shader == 0) {
-        std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
-
-        // setup vertex shader:
-        GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-        glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
-        glCompileShader(vertex_shader);
-        checkShaderCompileStatus(&vertex_shader, "vertex");
-
-        // setup geometry shader:
-        GLuint geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
-        glShaderSource(geometry_shader, 1, &geometry_shader_src, NULL);
-        glCompileShader(geometry_shader);
-        checkShaderCompileStatus(&geometry_shader, "geometry");
-
-        // setup fragment shader:
-        GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
-        glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
-        glCompileShader(fragment_shader);
-        checkShaderCompileStatus(&fragment_shader, "fragment");
-
-        _shader = glCreateProgram();
-
-        glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT, 8);
-        glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
-        glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
-
-        glAttachShader(_shader, vertex_shader);
-        glAttachShader(_shader, geometry_shader);
-        glAttachShader(_shader, fragment_shader);
-
-        glLinkProgram(_shader);
-        checkShaderLinkStatus(&_shader, "kekse");
+//        initShader();
     }
-    glUseProgram(_shader);
+
+//    // start using shaders:
+//    glUseProgram(_shader);
 //    glUniform1i(glGetUniformLocation(_shader, "tex"), 0);   /* we only use texture unit 0 */
 //    glUniform1f(glGetUniformLocation(_shader, "ripple_offset"), ripple_offset);
 
+    // set uniform shader variables:
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "ks"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "shininess"), 15.0f);
@@ -189,32 +160,12 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
 
+    // draw stuff:
 //    glutSolidTorus(0.1f, 0.5f, 100, 100);
     drawTreeStart();
 
-//    glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0,
-//            glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT));
-//    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//    glMatrixMode(GL_PROJECTION);
-//    glLoadIdentity();
-//    glMatrixMode(GL_MODELVIEW);
-//    glLoadIdentity();
-
-//    glEnable(GL_TEXTURE_2D);
-//    glBegin(GL_QUADS);
-//    glTexCoord2f(0.0f, 0.0f);
-//    glVertex3f(-1.0f, -1.0f, 0.0f);
-//    glTexCoord2f(1.0f, 0.0f);
-//    glVertex3f(1.0f, -1.0f, 0.0f);
-//    glTexCoord2f(1.0f, 1.0f);
-//    glVertex3f(1.0f, 1.0f, 0.0f);
-//    glTexCoord2f(0.0f, 1.0f);
-//    glVertex3f(-1.0f, 1.0f, 0.0f);
-//    glEnd();
-//    glDisable(GL_TEXTURE_2D);
-
-    glUseProgram(0);
-
+//    // end using shaders:
+//    glUseProgram(0);
     glutSwapBuffers();
 }
 
@@ -313,6 +264,52 @@ void Extra::mouseMove(int x, int y)
     //    std::cout << x << " " << y << std::endl;
 }
 
+/* builds cross product of <a x b> and saves it into result */
+void Extra::crossProduct (float a[], float b[], float result[]){
+//    float result[3];
+
+    result[0] = a[1] * b[2] - b[1] * a[2];
+    result[1] = a[2] * b[0] - b[2] * a[0];
+    result[2] = a[0] * b[1] - b[0] * a[1];
+
+//    return result;
+}
+
+/* normalizes given vector */
+void Extra::normalize (float n[]){
+    float lengh = sqrt(n[0]*n[0]  +  n[1]*n[1]  +  n[2]*n[2]);
+    if (lengh == 0){
+        std::cerr << "length of normal is 0" << std::endl;
+        return;
+    }
+    n[0] /= lengh;
+    n[1] /= lengh;
+    n[2] /= lengh;
+}
+
+/* draws trinagle abc with correct normal */
+void Extra::drawTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2){
+    float n[3];
+    float ba[3];
+    float bc[3];
+
+    ba[0] = a0 - b0;
+    ba[1] = a1 - b1;
+    ba[2] = a2 - b2;
+
+    bc[0] = c0 - b0;
+    bc[1] = c1 - b1;
+    bc[2] = c2 - b2;
+
+    crossProduct(bc, ba, n);
+    normalize(n);
+
+    glNormal3f(n[0], n[1], n[2]);
+    glVertex3f(a0, a1, a2);
+    glVertex3f(b0, b1, b2);
+    glVertex3f(c0, c1, c2);
+}
+
 void Extra::drawTreeStart()
 {
     float h = 2.f;
@@ -320,38 +317,54 @@ void Extra::drawTreeStart()
     float sq = 0.044194174f;
     float l = 0.03125f;
     float n = 0.f;
-    float norm[3];
 
     glDisable(GL_LIGHTING);//TODO remove
     glColor3f(0.5f , 0.25f , 0.08f);
     glBegin(GL_TRIANGLES);
 
-//    norm[0] =
-
-    glNormal3f(sq2half, n, sq2half);
-    glVertex3f(sq, n, -sq);
-//    glVertex3f(sq, h, -sq);
-//    glVertex3f(n, h, l);
-    glVertex3f(n, h, n);
-    glVertex3f(n, n, l);
-
-    glNormal3f(-sq2half, n, sq2half);
-    glVertex3f(n, n, l);
-//    glVertex3f(n, h, l);
-//    glVertex3f(-sq, h, -sq);
-    glVertex3f(n, h, n);
-    glVertex3f(-sq, n, -sq);
-
-    glNormal3f(n, n, -1.f);
-    glVertex3f(-sq, n, -sq);
-//    glVertex3f(-sq, h, -sq);
-//    glVertex3f(sq, h, -sq);
-    glVertex3f(n, h, n);
-    glVertex3f(sq, n, -sq);
+    drawTriangle( sq, n,-sq   ,  n,h,n  ,    n, n,  l);
+    drawTriangle(  n, n,  l   ,  n,h,n  ,  -sq, n,-sq);
+    drawTriangle(-sq, n,-sq   ,  n,h,n  ,   sq, n, -sq);
 
     glEnd();
     glColor3f(1.0f, 1.0f, 1.0f);
     glEnable(GL_LIGHTING);//TODO remove
+}
+
+void Extra::initShader()
+{
+    std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
+
+    // setup vertex shader:
+    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
+    glCompileShader(vertex_shader);
+    checkShaderCompileStatus(&vertex_shader, "vertex");
+
+    // setup geometry shader:
+    GLuint geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
+    glShaderSource(geometry_shader, 1, &geometry_shader_src, NULL);
+    glCompileShader(geometry_shader);
+    checkShaderCompileStatus(&geometry_shader, "geometry");
+
+    // setup fragment shader:
+    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_shader_src, NULL);
+    glCompileShader(fragment_shader);
+    checkShaderCompileStatus(&fragment_shader, "fragment");
+
+    _shader = glCreateProgram();
+
+    glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT, 8);
+    glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
+    glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+
+    glAttachShader(_shader, vertex_shader);
+    glAttachShader(_shader, geometry_shader);
+    glAttachShader(_shader, fragment_shader);
+
+    glLinkProgram(_shader);
+    checkShaderLinkStatus(&_shader, "kekse");
 }
 
 int main(int argc, char *argv[])
