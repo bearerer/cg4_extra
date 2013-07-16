@@ -13,6 +13,7 @@ varying out vec3 gV;    // View vector in eye space, not normalized
 
 uniform float branchHeight;
 uniform float branchThickness;
+uniform float branchUp;
 uniform vec3 light_position;    // Light position in object space
 
 void emit_vertex(vec4 pos, vec3 normal, vec3 light, vec3 view)
@@ -38,16 +39,18 @@ void emit_vertex_auto(vec4 pos, vec3 normal){
 
 void drawBranch(vec4 a, vec4 b, vec4 c){
     vec4 ac = 0.5 * (a + c);
-    vec4 M = branchHeight * b + (1.0 - branchHeight) * ac;
 
-    vec4 d = branchThickness * M + (1.0 - branchThickness) * a;
-    vec4 e = branchThickness * M + (1.0 - branchThickness) * b;
-    vec4 f = branchThickness * M + (1.0 - branchThickness) * c;
+    float height = branchHeight + 0.1 * sin(dot(a.xy, vec2(12.9898,78.233)));
 
-    vec3 gNorm = normalize(cross((e - d).xyz, (f - d).xyz));
+    vec4 M = height * b + (1.0 - height) * ac;
 
-//    vec4 g = M + 0.3333 * vec4(vN[0] + vN[1] + vN[2], 0.0) * length(M - ac);
-    vec4 g = M + vec4(gNorm, 0.0) * branchHeight * length(M - ac);
+    vec4 e = (1.0 - branchThickness) * M + branchThickness * b;
+    vec4 fd = M * 1.7071 - e * 0.7071;
+    vec4 d = fd + (a - c) * 5.0 * branchThickness;
+    vec4 f = fd - (a - c) * 5.0 * branchThickness;
+
+    vec3 gNorm = normalize(branchUp * (e - M).xyz + cross((e - d).xyz, (f - d).xyz));
+    vec4 g = M + vec4(gNorm, 0.0) * length(M - ac) / (height * 3.0);
 
     vec3 dNorm = normalize(cross((g - e).xyz, (f - e).xyz));
     vec3 eNorm = normalize(cross((g - f).xyz, (d - f).xyz));
@@ -76,7 +79,7 @@ void main(void)
     vec4 v1 = gl_PositionIn[1];
     vec4 v2 = gl_PositionIn[2];
 
-    // Emit original triangle
+    // emit original triangle:
     emit_vertex(v0, vN[0], vL[0], vV[0]);
     emit_vertex(v1, vN[1], vL[1], vV[1]);
     emit_vertex(v2, vN[2], vL[2], vV[2]);

@@ -19,6 +19,9 @@ bool Extra::_camRotating = false;
 bool Extra::_camZooming = false;
 float Extra::_alpha = 0.f;
 size_t Extra::_lightModel = 0;
+float Extra::_branchThickness = 0.04f;
+float Extra::_branchHeight = 0.65f;
+float Extra::_branchUp = 0.1f;
 
 /* GLUT state */
 GLboolean glut_stereo = 0;
@@ -157,8 +160,9 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
 
-    glUniform1f(glGetUniformLocation(_shader, "branchHeight"), 0.6f);
-    glUniform1f(glGetUniformLocation(_shader, "branchThickness"), 0.95f);
+    glUniform1f(glGetUniformLocation(_shader, "branchHeight"), _branchHeight);
+    glUniform1f(glGetUniformLocation(_shader, "branchThickness"), _branchThickness);
+    glUniform1f(glGetUniformLocation(_shader, "branchUp"), _branchUp);
 
     // draw stuff:
 //    glutSolidTorus(0.1f, 0.5f, 100, 100);
@@ -167,6 +171,58 @@ void Extra::display()
     // end using shaders:
     glUseProgram(0);
     glutSwapBuffers();
+
+    // BUFFERS:
+/*
+ *see this:
+http://pastebin.com/KTQyV2pZ
+
+also maybe this:
+http://www.twodee.org/weblog/?p=881     <<---------------------oh yeah this looks good
+
+
+
+        printf("Preparing buffer\n");
+        glGenBuffersARB(1, &bid);
+        glBindBufferARB(GL_ARRAY_BUFFER, bid);
+        const float init[] = {0.1f,0.2f,0.3f,0.4f};
+        glBufferDataARB(GL_ARRAY_BUFFER, 4*sizeof(float)*1, NULL, GL_STREAM_DRAW);
+        printf("Buffer prepared (current error: %d)\n",glGetError());
+
+        glBindBufferBaseEXT(GL_TRANSFORM_FEEDBACK_BUFFER_EXT, 0, bid);
+        printf("Feedback assigned (current error: %d)\n\n",glGetError());
+
+        printf("Beginning drawing\n");
+        glUseProgramObjectARB(shid);
+        glBeginTransformFeedbackEXT(GL_POINTS);
+        glEnable(GL_RASTERIZER_DISCARD_EXT);
+
+        glBegin(GL_POINTS);
+        printf("In data: ");
+        for(int i=0; i<4; ++i) {
+                printf("%.1f ", init[i]);
+        }
+        printf("\n");
+        glVertex4fv(init);
+        glEnd();
+
+        glDisable(GL_RASTERIZER_DISCARD_EXT);
+        glEndTransformFeedbackEXT();
+        printf("Drawing completed (current error: %d)\n\n", glGetError());
+
+        printf("Reading (hopefully transformed) data\n");
+        float *const data = (float *)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
+        printf("Out data: ");
+        for(int i=0; i<4; ++i) {
+                printf("%.1f ", data[i]);
+        }
+        printf("\n");
+        glUnmapBuffer(GL_ARRAY_BUFFER);
+        printf("Readback complete (current error: %d)",glGetError());
+
+        */
+
+
 }
 
 /* GLUT idle func */
@@ -205,6 +261,30 @@ void Extra::keyboard(unsigned char key, int x, int y)
         break;
     case 'l':
         _lightModel = (_lightModel + 1) % 3;
+        break;
+    case 't':
+        _branchThickness -= 0.01f;
+        if (_branchThickness <= 0.f) _branchThickness = 0.01f;
+        break;
+    case 'T':
+        _branchThickness += 0.01f;
+        if (_branchThickness >= 1.f) _branchThickness = 0.99f;
+        break;
+    case 'H':
+        _branchHeight -= 0.01f;
+        if (_branchHeight <= 0.1f) _branchHeight = 0.11f;
+        break;
+    case 'h':
+        _branchHeight += 0.01f;
+        if (_branchHeight >= 0.9f) _branchHeight = 0.89f;
+        break;
+    case 'U':
+        _branchUp -= 0.01f;
+        if (_branchUp <= -0.1f) _branchUp = -0.09f;
+        break;
+    case 'u':
+        _branchUp += 0.01f;
+        if (_branchUp >= 0.2f) _branchUp = 0.19f;
         break;
     }
 }
@@ -316,14 +396,15 @@ void Extra::drawTreeStart()
     float sq = 0.044194174f;
     float l = 0.03125f;
     float n = 0.f;
+    float b = -1.f;
 
 //    glDisable(GL_LIGHTING);//TODO remove
     glColor3f(0.5f , 0.25f , 0.08f);
     glBegin(GL_TRIANGLES);
 
-    drawTriangle( sq, n,-sq   ,  n,h,n  ,    n, n,  l);
-    drawTriangle(  n, n,  l   ,  n,h,n  ,  -sq, n,-sq);
-    drawTriangle(-sq, n,-sq   ,  n,h,n  ,   sq, n, -sq);
+    drawTriangle( sq, b,-sq   ,  n,h+b,n  ,    n, b,  l);
+    drawTriangle(  n, b,  l   ,  n,h+b,n  ,  -sq, b,-sq);
+    drawTriangle(-sq, b,-sq   ,  n,h+b,n  ,   sq, b, -sq);
 
     glEnd();
     glColor3f(1.0f, 1.0f, 1.0f);
@@ -399,3 +480,5 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+

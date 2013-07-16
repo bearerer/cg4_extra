@@ -31,6 +31,9 @@ private:
     static GLuint _shader;
     static bool _camRotating, _camZooming;
     static size_t _lightModel;
+    static float _branchThickness;
+    static float _branchHeight;
+    static float _branchUp;
 };
 
 
