@@ -24,9 +24,9 @@ public:
     static void drawTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2);
     static void normalize(float n[]);
     static void crossProduct(float a[], float b[], float result[]);
+    static void initShaders();
 private:
     static void drawTreeStart();
-    static void initShader();
 
     static GLuint _shader;
     static bool _camRotating, _camZooming;

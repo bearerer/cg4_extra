@@ -31,7 +31,6 @@ in vec3 gV;    // View vector in eye space, not normalized
 //in vec3 vL;    // Light vector in eye space, not normalized
 //in vec3 vV;    // View vector in eye space, not normalized
 
-
 /* Isotropic Blinn-Phong lighting */
 vec3 blinn_phong(vec3 N, vec3 L, vec3 V, vec3 H)
 {
@@ -116,5 +115,6 @@ void main(void)
     }
 
     // Resulting color at this fragment:
+//    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
     gl_FragColor = vec4(surface_color * color, 1.0);
 }

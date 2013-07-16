@@ -139,33 +139,33 @@ void Extra::display()
         tex_h = glutGet(GLUT_WINDOW_HEIGHT);
     }
 
-    if (_shader == 0) {
-//        initShader();
-    }
-
-//    // start using shaders:
-//    glUseProgram(_shader);
+    // start using shaders:
+    glUseProgram(_shader);
 //    glUniform1i(glGetUniformLocation(_shader, "tex"), 0);   /* we only use texture unit 0 */
 //    glUniform1f(glGetUniformLocation(_shader, "ripple_offset"), ripple_offset);
 
     // set uniform shader variables:
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "ks"), 0.8f);
-    glUniform1f(glGetUniformLocation(_shader, "shininess"), 15.0f);
-    glUniform3f(glGetUniformLocation(_shader, "light_position"), -10.0f+10.0f*cos(_alpha), 10.0f, 4.0f+10.0f*sin(_alpha));
+    glUniform1f(glGetUniformLocation(_shader, "shininess"), 5.0f);
+    glUniform3f(glGetUniformLocation(_shader, "light_position"), 10.0f*cos(_alpha), 10.0f, 10.0f*sin(_alpha));
     glUniform3f(glGetUniformLocation(_shader, "light_color"), 1.0f, 1.0f, 1.0f);
-    glUniform3f(glGetUniformLocation(_shader, "surface_color"), 0.8f, 0.8f, 1.0f);
+    glUniform3f(glGetUniformLocation(_shader, "surface_color"), 0.5f, 0.25f, 0.08f);
     glUniform1i(glGetUniformLocation(_shader, "model"), _lightModel);
     glUniform1f(glGetUniformLocation(_shader, "r"), 0.2f);
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
+    glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
+
+    glUniform1f(glGetUniformLocation(_shader, "branchHeight"), 0.6f);
+    glUniform1f(glGetUniformLocation(_shader, "branchThickness"), 0.95f);
 
     // draw stuff:
 //    glutSolidTorus(0.1f, 0.5f, 100, 100);
     drawTreeStart();
 
-//    // end using shaders:
-//    glUseProgram(0);
+    // end using shaders:
+    glUseProgram(0);
     glutSwapBuffers();
 }
 
@@ -313,12 +313,11 @@ void Extra::drawTriangle(float a0, float a1, float a2, float b0, float b1, float
 void Extra::drawTreeStart()
 {
     float h = 2.f;
-    float sq2half = 0.707106781f;
     float sq = 0.044194174f;
     float l = 0.03125f;
     float n = 0.f;
 
-    glDisable(GL_LIGHTING);//TODO remove
+//    glDisable(GL_LIGHTING);//TODO remove
     glColor3f(0.5f , 0.25f , 0.08f);
     glBegin(GL_TRIANGLES);
 
@@ -328,10 +327,10 @@ void Extra::drawTreeStart()
 
     glEnd();
     glColor3f(1.0f, 1.0f, 1.0f);
-    glEnable(GL_LIGHTING);//TODO remove
+//    glEnable(GL_LIGHTING);//TODO remove
 }
 
-void Extra::initShader()
+void Extra::initShaders()
 {
     std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
@@ -355,7 +354,7 @@ void Extra::initShader()
 
     _shader = glCreateProgram();
 
-    glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT, 8);
+    glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT,12);
     glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
     glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
 
@@ -379,6 +378,8 @@ int main(int argc, char *argv[])
 
     /* Initialize OpenGL extensions */
     glewInit();
+
+    Extra::initShaders();
 
     Extra::_cam = new Camera();
     Extra::_cam->setMaxDistance(SKYBOX_OFFSET / 2.f);

@@ -15,7 +15,7 @@ void main(void)
     /* Geometry computation. */
 
     // Transform the vertex:
-    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
+    gl_Position = gl_Vertex;
 
     /* Lighting computation, in eye space. */
 
