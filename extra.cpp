@@ -22,6 +22,12 @@ size_t Extra::_lightModel = 0;
 float Extra::_branchThickness = 0.04f;
 float Extra::_branchHeight = 0.65f;
 float Extra::_branchUp = 0.1f;
+bool Extra::_isFirst = true;
+
+GLuint Extra::_currentVB = 0;
+GLuint Extra::_currentTFB = 0;
+GLuint Extra::_branchBuffer[AMOUNT_BUFFER];
+GLuint Extra::_transformFeedback[AMOUNT_BUFFER];
 
 /* GLUT state */
 GLboolean glut_stereo = 0;
@@ -163,13 +169,30 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "branchThickness"), _branchThickness);
     glUniform1f(glGetUniformLocation(_shader, "branchUp"), _branchUp);
 
+
+
+//    glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[0]);
+//    glBeginTransformFeedback(GL_TRIANGLES);
+
+
+//    if (_isFirst) {
+//        glDrawArrays(GL_TRIANGLES, 0, 1);
+//        _isFirst = false;
+//    } else {
+//        glDrawTransformFeedback(GL_POINTS, _transformFeedback[_currentVB]);
+//    }
+
     // draw stuff:
 //    glutSolidTorus(0.1f, 0.5f, 100, 100);
     drawTreeStart();
 
+//    glEndTransformFeedback();
+
+
     // end using shaders:
     glUseProgram(0);
     glutSwapBuffers();
+
 
     // BUFFERS:
 /*
@@ -178,7 +201,7 @@ http://pastebin.com/KTQyV2pZ
 
 also maybe this:
 http://www.twodee.org/weblog/?p=881     <<---------------------oh yeah this looks good
-
+http://ogldev.atspace.co.uk/www/tutorial28/tutorial28.html <<-----------also this one
 
 
         printf("Preparing buffer\n");
@@ -421,7 +444,99 @@ void Extra::drawTreeStart()
 
     glEnd();
     glColor3f(1.0f, 1.0f, 1.0f);
-//    glEnable(GL_LIGHTING);//TODO remove
+    //    glEnable(GL_LIGHTING);//TODO remove
+}
+
+Extra::MyVertex* Extra::getTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2)
+{
+    float n[3];
+    float ba[3];
+    float bc[3];
+    MyVertex result[3];
+
+    ba[0] = a0 - b0;
+    ba[1] = a1 - b1;
+    ba[2] = a2 - b2;
+
+    bc[0] = c0 - b0;
+    bc[1] = c1 - b1;
+    bc[2] = c2 - b2;
+
+    n[0] = a0;
+    n[1] = a1 + 1.f;
+    n[2] = a2;
+    normalize(n);
+    result[0].nx = n[0];
+    result[0].ny = n[1];
+    result[0].nz = n[2];
+    result[0].x = a0;
+    result[0].y = a1;
+    result[0].z = a2;
+
+    n[0] = a0 + c0;
+    n[1] = b1 - 1.f;
+    n[2] = a2 + c2;
+    normalize(n);
+    result[1].nx = n[0];
+    result[1].ny = n[1];
+    result[1].nz = n[2];
+    result[1].x = b0;
+    result[1].y = b1;
+    result[1].z = b2;
+
+    n[0] = c0;
+    n[1] = c1 + 1.f;
+    n[2] = c2;
+    normalize(n);
+    result[2].nx = n[0];
+    result[2].ny = n[1];
+    result[2].nz = n[2];
+    result[2].x = c0;
+    result[2].y = c1;
+    result[2].z = c2;
+
+    return result;
+}
+
+void Extra::fillTreeStart(MyVertex branch[])
+{
+    float h = 2.f;
+    float sq = 0.044194174f;
+    float l = 0.03125f;
+    float n = 0.f;
+    float b = -1.f;
+    MyVertex *tmp;
+
+    tmp = getTriangle(sq, b,-sq   ,  n,h+b,n  ,    n, b,  l);
+    branch[0] = tmp[0];
+    branch[1] = tmp[1];
+    branch[2] = tmp[2];
+
+    tmp = getTriangle(  n, b,  l   ,  n,h+b,n  ,  -sq, b,-sq);
+    branch[3] = tmp[0];
+    branch[4] = tmp[1];
+    branch[5] = tmp[2];
+
+    tmp = getTriangle(-sq, b,-sq   ,  n,h+b,n  ,   sq, b, -sq);
+    branch[6] = tmp[0];
+    branch[7] = tmp[1];
+    branch[8] = tmp[2];
+}
+
+void Extra::initTFB()
+{
+    MyVertex branch[MAX_VERTICES];
+    fillTreeStart(branch);
+
+    glGenTransformFeedbacks(AMOUNT_BUFFER, _transformFeedback);
+    glGenBuffers(AMOUNT_BUFFER, _branchBuffer);
+
+    for (unsigned int i = 0; i < AMOUNT_BUFFER ; i++) {
+        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, _transformFeedback[i]);
+        glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[i]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * MAX_VERTICES, branch, GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, _branchBuffer[i]);
+    }
 }
 
 void Extra::initShaders()
@@ -480,6 +595,8 @@ int main(int argc, char *argv[])
     Extra::_cam->setDistance(SKYBOX_OFFSET / 4.f);
     Extra::_cam->update();
     Extra::_cam->setup();
+
+    Extra::initTFB();
 
     /* Start GLUT loop */
     glutDisplayFunc(Extra::display);

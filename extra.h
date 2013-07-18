@@ -4,9 +4,21 @@
 #include "Skybox.h"
 #include "camera.h"
 
+#define MAX_VERTICES 10000
+#define AMOUNT_BUFFER 2
+
 class Extra {
 
 public:
+    struct MyVertex{
+        float x;
+        float y;
+        float z;
+        float nx;
+        float ny;
+        float nz;
+    };
+
     static void display();
     static void idle();
     static void keyboard(unsigned char key, int x, int y);
@@ -25,8 +37,11 @@ public:
     static void normalize(float n[]);
     static void crossProduct(float a[], float b[], float result[]);
     static void initShaders();
+    static void initTFB();
 private:
     static void drawTreeStart();
+    static void fillTreeStart(MyVertex branch[]);
+    static MyVertex* getTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2);
 
     static GLuint _shader;
     static bool _camRotating, _camZooming;
@@ -34,6 +49,11 @@ private:
     static float _branchThickness;
     static float _branchHeight;
     static float _branchUp;
+    static bool _isFirst;
+
+    static GLuint _currentVB, _currentTFB;
+    static GLuint _branchBuffer[AMOUNT_BUFFER];
+    static GLuint _transformFeedback[AMOUNT_BUFFER];
 };
 
 
