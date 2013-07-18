@@ -158,7 +158,6 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "r"), 0.2f);
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
-    glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
 
     glUniform1f(glGetUniformLocation(_shader, "branchHeight"), _branchHeight);
     glUniform1f(glGetUniformLocation(_shader, "branchThickness"), _branchThickness);
@@ -381,12 +380,26 @@ void Extra::drawTriangle(float a0, float a1, float a2, float b0, float b1, float
     bc[1] = c1 - b1;
     bc[2] = c2 - b2;
 
-    crossProduct(bc, ba, n);
-    normalize(n);
+//    crossProduct(bc, ba, n);
+//    normalize(n);
 
+    n[0] = a0;
+    n[1] = a1 + 1.f;
+    n[2] = a2;
+    normalize(n);
     glNormal3f(n[0], n[1], n[2]);
     glVertex3f(a0, a1, a2);
+    n[0] = a0 + c0;
+    n[1] = b1 - 1.f;
+    n[2] = a2 + c2;
+    normalize(n);
+    glNormal3f(n[0], n[1], n[2]);
     glVertex3f(b0, b1, b2);
+    n[0] = c0;
+    n[1] = c1 + 1.f;
+    n[2] = c2;
+    normalize(n);
+    glNormal3f(n[0], n[1], n[2]);
     glVertex3f(c0, c1, c2);
 }
 
