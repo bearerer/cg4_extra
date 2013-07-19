@@ -3,6 +3,9 @@
 /* Variables for lighting */
 uniform vec3 light_position;    // Light position in object space
 
+attribute vec4 InVertex;  //w will be set to 1.0 automatically
+attribute vec3 InNormal;
+
 /* Variables passed to the fragment shader */
 varying out vec3 vN;    // Normal in eye space, not normalized
 varying out vec3 vT;    // Tangent in eye space, not normalized
@@ -15,7 +18,8 @@ void main(void)
     /* Geometry computation. */
 
     // Transform the vertex:
-    gl_Position = gl_Vertex;
+//    gl_Position = gl_Vertex;
+    gl_Position = InVertex;
 
     /* Lighting computation, in eye space. */
 
@@ -26,7 +30,9 @@ void main(void)
     // The light position in eye space.
     vec3 light_pos = (gl_ModelViewMatrix * vec4(light_position, 1.0)).xyz;
     // The normal in eye space.
-    vN = gl_NormalMatrix * gl_Normal;
+//    vN = gl_NormalMatrix * gl_Normal;
+    vN = gl_NormalMatrix * InNormal;
+
     // The tangent in eye space.
     // Note: normally these would be precomputed and stored with the model.
     // This method here is just a hack. For example, it will fail if vN is

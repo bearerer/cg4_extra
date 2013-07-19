@@ -24,10 +24,13 @@ float Extra::_branchHeight = 0.65f;
 float Extra::_branchUp = 0.1f;
 bool Extra::_isFirst = true;
 
-GLuint Extra::_currentVB = 0;
-GLuint Extra::_currentTFB = 0;
+GLuint Extra::_currentVB;
+GLuint Extra::_currentTFB;
 GLuint Extra::_branchBuffer[AMOUNT_BUFFER];
 GLuint Extra::_transformFeedback[AMOUNT_BUFFER];
+
+GLint Extra::_vertexLoc;
+GLint Extra::_normalLoc;
 
 /* GLUT state */
 GLboolean glut_stereo = 0;
@@ -125,12 +128,9 @@ void Extra::display()
     gluPerspective(fovy, aspect, zNear, zFar);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-//    gluLookAt(eyeX, eyeY, eyeZ, objX, objY, objZ, upX, upY, upZ);
-    Extra::_cam->setup();
+    _cam->setup();
 
-//    glTranslatef(objX, objY, objZ);
-
-    Extra::_skybox->draw(eyeX, eyeY, eyeZ);
+    _skybox->draw(eyeX, eyeY, eyeZ);
 
     /* Read rendered scene from back buffer into texture */
     if (tex == 0) {
@@ -150,8 +150,6 @@ void Extra::display()
 
     // start using shaders:
     glUseProgram(_shader);
-//    glUniform1i(glGetUniformLocation(_shader, "tex"), 0);   /* we only use texture unit 0 */
-//    glUniform1f(glGetUniformLocation(_shader, "ripple_offset"), ripple_offset);
 
     // set uniform shader variables:
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
@@ -164,87 +162,85 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "r"), 0.2f);
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
-
     glUniform1f(glGetUniformLocation(_shader, "branchHeight"), _branchHeight);
     glUniform1f(glGetUniformLocation(_shader, "branchThickness"), _branchThickness);
     glUniform1f(glGetUniformLocation(_shader, "branchUp"), _branchUp);
 
+    updateTFB();
+    renderTFB();
 
-
-//    glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[0]);
-//    glBeginTransformFeedback(GL_TRIANGLES);
-
-
-//    if (_isFirst) {
-//        glDrawArrays(GL_TRIANGLES, 0, 1);
-//        _isFirst = false;
-//    } else {
-//        glDrawTransformFeedback(GL_POINTS, _transformFeedback[_currentVB]);
-//    }
-
-    // draw stuff:
 //    glutSolidTorus(0.1f, 0.5f, 100, 100);
-    drawTreeStart();
+//    drawTreeStart();
 
-//    glEndTransformFeedback();
-
+    _currentVB = _currentTFB;
+    _currentTFB = (_currentTFB + 1) & 0x1;
 
     // end using shaders:
     glUseProgram(0);
     glutSwapBuffers();
 
+    // http://ogldev.atspace.co.uk/www/tutorial28/tutorial28.html
+}
 
-    // BUFFERS:
-/*
- *see this:
-http://pastebin.com/KTQyV2pZ
+void Extra::updateTFB()
+{
+//    glEnable(GL_RASTERIZER_DISCARD);
+    glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[_currentVB]);
+    glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, _transformFeedback[_currentTFB]);
 
-also maybe this:
-http://www.twodee.org/weblog/?p=881     <<---------------------oh yeah this looks good
-http://ogldev.atspace.co.uk/www/tutorial28/tutorial28.html <<-----------also this one
+    glEnableVertexAttribArray(_vertexLoc);
+    glEnableVertexAttribArray(_normalLoc);
 
+    glVertexAttribPointer(_vertexLoc, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(0)); // position
+    glVertexAttribPointer(_normalLoc, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(sizeof(float)*3)); // normal
 
-        printf("Preparing buffer\n");
-        glGenBuffersARB(1, &bid);
-        glBindBufferARB(GL_ARRAY_BUFFER, bid);
-        const float init[] = {0.1f,0.2f,0.3f,0.4f};
-        glBufferDataARB(GL_ARRAY_BUFFER, 4*sizeof(float)*1, NULL, GL_STREAM_DRAW);
-        printf("Buffer prepared (current error: %d)\n",glGetError());
+    glBeginTransformFeedback(GL_TRIANGLES);
 
-        glBindBufferBaseEXT(GL_TRANSFORM_FEEDBACK_BUFFER_EXT, 0, bid);
-        printf("Feedback assigned (current error: %d)\n\n",glGetError());
+    // draw stuff:
+    if (_isFirst) {
+        glDrawArrays(GL_TRIANGLES, 0, 9);
+//        _isFirst = false;//TODO back in
+    } else {
+        glDrawTransformFeedback(GL_POINTS, _transformFeedback[_currentVB]);
+    }
 
-        printf("Beginning drawing\n");
-        glUseProgramObjectARB(shid);
-        glBeginTransformFeedbackEXT(GL_POINTS);
-        glEnable(GL_RASTERIZER_DISCARD_EXT);
+    glEndTransformFeedback();
+}
 
-        glBegin(GL_POINTS);
-        printf("In data: ");
-        for(int i=0; i<4; ++i) {
-                printf("%.1f ", init[i]);
-        }
-        printf("\n");
-        glVertex4fv(init);
-        glEnd();
+void Extra::renderTFB()
+{
+    glDisable(GL_RASTERIZER_DISCARD);
+    glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[_currentTFB]);
 
-        glDisable(GL_RASTERIZER_DISCARD_EXT);
-        glEndTransformFeedbackEXT();
-        printf("Drawing completed (current error: %d)\n\n", glGetError());
+    glEnableVertexAttribArray(_vertexLoc);
+    glEnableVertexAttribArray(_normalLoc);
 
-        printf("Reading (hopefully transformed) data\n");
-        float *const data = (float *)glMapBuffer(GL_ARRAY_BUFFER, GL_READ_ONLY);
-        printf("Out data: ");
-        for(int i=0; i<4; ++i) {
-                printf("%.1f ", data[i]);
-        }
-        printf("\n");
-        glUnmapBuffer(GL_ARRAY_BUFFER);
-        printf("Readback complete (current error: %d)",glGetError());
+    glVertexAttribPointer(_vertexLoc, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(0)); // position
+    glVertexAttribPointer(_normalLoc, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(sizeof(float)*3)); // normal
+    glDrawTransformFeedback(GL_POINTS, _transformFeedback[_currentTFB]);
 
-        */
+    glDisableVertexAttribArray(_vertexLoc);
+    glDisableVertexAttribArray(_normalLoc);
 
+}
 
+void Extra::initTFB()
+{
+    MyVertex branch[MAX_VERTICES];
+    fillTreeStart(branch);
+
+    glGenTransformFeedbacks(AMOUNT_BUFFER, _transformFeedback);
+    glGenBuffers(AMOUNT_BUFFER, _branchBuffer);
+
+    for (unsigned int i = 0; i < AMOUNT_BUFFER ; i++) {
+        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, _transformFeedback[i]);
+        glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[i]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * MAX_VERTICES, branch, GL_DYNAMIC_DRAW);
+        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, _branchBuffer[i]);
+    }
+
+    _vertexLoc = glGetAttribLocation(_shader, "InVertex");
+    _normalLoc = glGetAttribLocation(_shader, "InNormal");
 }
 
 /* GLUT idle func */
@@ -362,8 +358,6 @@ void Extra::mouseMove(int x, int y)
     // update state
     _cam->setLastX(x);
     _cam->setLastY(y);
-
-    //    std::cout << x << " " << y << std::endl;
 }
 
 /* builds cross product of <a x b> and saves it into result */
@@ -523,22 +517,6 @@ void Extra::fillTreeStart(MyVertex branch[])
     branch[8] = tmp[2];
 }
 
-void Extra::initTFB()
-{
-    MyVertex branch[MAX_VERTICES];
-    fillTreeStart(branch);
-
-    glGenTransformFeedbacks(AMOUNT_BUFFER, _transformFeedback);
-    glGenBuffers(AMOUNT_BUFFER, _branchBuffer);
-
-    for (unsigned int i = 0; i < AMOUNT_BUFFER ; i++) {
-        glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, _transformFeedback[i]);
-        glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer[i]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * MAX_VERTICES, branch, GL_DYNAMIC_DRAW);
-        glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, _branchBuffer[i]);
-    }
-}
-
 void Extra::initShaders()
 {
     std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
@@ -573,6 +551,9 @@ void Extra::initShaders()
 
     glLinkProgram(_shader);
     checkShaderLinkStatus(&_shader, "kekse");
+
+    _currentVB = 0;
+    _currentTFB = 1;
 }
 
 int main(int argc, char *argv[])

@@ -6,6 +6,7 @@
 
 #define MAX_VERTICES 10000
 #define AMOUNT_BUFFER 2
+#define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 class Extra {
 
@@ -42,6 +43,8 @@ private:
     static void drawTreeStart();
     static void fillTreeStart(MyVertex branch[]);
     static MyVertex* getTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2);
+    static void updateTFB();
+    static void renderTFB();
 
     static GLuint _shader;
     static bool _camRotating, _camZooming;
@@ -54,6 +57,8 @@ private:
     static GLuint _currentVB, _currentTFB;
     static GLuint _branchBuffer[AMOUNT_BUFFER];
     static GLuint _transformFeedback[AMOUNT_BUFFER];
+    static GLint _vertexLoc;
+    static GLint _normalLoc;
 };
 
 
