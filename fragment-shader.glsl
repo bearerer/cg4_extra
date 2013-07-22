@@ -1,4 +1,6 @@
-#version 120
+#version 330
+
+out vec4 fs_color;
 
 /* Lighting model to use:
  * 0 = Isotropic Blinn-Phong
@@ -115,6 +117,5 @@ void main(void)
     }
 
     // Resulting color at this fragment:
-//    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
-    gl_FragColor = vec4(surface_color * color, 1.0);
+    fs_color = vec4(surface_color * color, 1.0);
 }

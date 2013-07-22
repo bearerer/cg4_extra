@@ -5,7 +5,6 @@
 #include "camera.h"
 
 #define MAX_VERTICES 10000
-#define AMOUNT_BUFFER 2
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 class Extra {
@@ -52,13 +51,12 @@ private:
     static float _branchThickness;
     static float _branchHeight;
     static float _branchUp;
-    static bool _isFirst;
+    static size_t _steps;
+    static GLuint _geometryTriangles;
 
-    static GLuint _currentVB, _currentTFB;
-    static GLuint _branchBuffer[AMOUNT_BUFFER];
-    static GLuint _transformFeedback[AMOUNT_BUFFER];
-    static GLint _vertexLoc;
-    static GLint _normalLoc;
+    static GLuint _branchBuffer;
+    static GLuint _transformFeedback;
+    static MyVertex _branch[MAX_VERTICES];
 };
 
 
