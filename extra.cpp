@@ -1,21 +1,25 @@
 #include <stdio.h>
 #include <string.h>
+#include <cstring>
 #include <math.h>
-#include <cassert>
 
 #include <GL/glew.h>
 #include <GL/glut.h>
 #include <GL/glu.h>
 
 #include "extra.h"
+#include <cassert>
 
 #include "fragment-shader.glsl.h"
 #include "vertex-shader.glsl.h"
 #include "geometry-shader.glsl.h"
+#include "transformFeedback_vertex.glsl.h"
+#include "transformFeedback_geometry.glsl.h"
 
 SkyBox *Extra::_skybox;
 Camera *Extra::_cam;
 GLuint Extra::_shader;
+GLuint Extra::_tfShader;
 bool Extra::_camRotating = false;
 bool Extra::_camZooming = false;
 float Extra::_alpha = 0.f;
@@ -24,8 +28,8 @@ float Extra::_branchThickness = 0.04f;
 float Extra::_branchHeight = 0.65f;
 float Extra::_branchUp = 0.1f;
 size_t Extra::_steps = 1;
-GLuint Extra::_geometryTriangles = 3;// initially: 3 triangles
-Extra::MyVertex Extra::_branch[MAX_VERTICES];
+GLuint Extra::_geometry_prg = 0;
+GLuint Extra::_tf_query = 0;
 
 GLuint Extra::_branchBuffer;
 GLuint Extra::_transformFeedback;
@@ -48,62 +52,20 @@ GLfloat ripple_offset = 0.0f;
 const GLchar *fragment_shader_src = fragment_shader_glsl;
 const GLchar *vertex_shader_src = vertex_shader_glsl;
 const GLchar *geometry_shader_src = geometry_shader_glsl;
-
-
-bool Extra::checkShaderCompileStatus(GLuint *shader, std::string sh)
-{
-    GLint compiled;
-    glGetObjectParameterivARB(*shader, GL_COMPILE_STATUS, &compiled);
-    if (!compiled)
-    {
-        GLint blen = 0;
-        GLsizei slen = 0;
-        glGetShaderiv(*shader, GL_INFO_LOG_LENGTH , &blen);
-        if (blen > 1){
-            GLchar* compiler_log = (GLchar*)malloc(blen);
-            glGetInfoLogARB(*shader, blen, &slen, compiler_log);
-            std::cout << "Error in " << sh << ", ";
-            std::cout << "compiler_log:\n" << compiler_log;
-            free (compiler_log);
-        }
-        std::cout << std::flush;
-        return false;
-    }
-    return true;
-}
-
-bool Extra::checkShaderLinkStatus(GLuint *shader, std::string sh)
-{
-    GLint compiled;
-    glGetObjectParameterivARB(*shader, GL_LINK_STATUS, &compiled);
-    if (!compiled)
-    {
-        std::cout << "error" << std::endl;
-        GLint blen = 1024;
-        GLsizei slen = 0;
-        GLchar* compiler_log = (GLchar*)malloc(blen);
-        glGetProgramInfoLog(*shader, blen, &slen, compiler_log);
-
-        std::cout << "compiler_log:\n" << compiler_log;
-        free (compiler_log);
-
-        std::cout << std::flush;
-        return false;
-    }
-    return true;
-}
-
+const GLchar *tf_geometry_shader_src = transformFeedback_geometry_glsl;
+const GLchar *tf_vertex_shader_src = transformFeedback_vertex_glsl;
 
 /* GLUT display function */
 void Extra::display()
 {
-    static GLuint tex = 0;
-    static GLint tex_w = 0, tex_h = 0;
+    GLuint tex = 0;
+    GLint tex_w = 0, tex_h = 0;
+
+    GLuint geometryTriangles = 3; // initially: 3 vertices
 
     _alpha += 0.02f;
 
     GLfloat objX = 2.0f, objY = 3.0f, objZ = 1.0f;
-//    GLfloat upX = 0.0f, upY = 1.0f, upZ = 0.0f;
     GLfloat eyeX = 2.0f * cosf(rotation_angle / 180.0f * (float)M_PI) + objX;
     GLfloat eyeY = cosf(3.0f * rotation_angle / 180.0f * (float)M_PI) + objY;
     GLfloat eyeZ = 2.0f * sinf(rotation_angle / 180.0f * (float)M_PI) + objZ;
@@ -146,10 +108,44 @@ void Extra::display()
         tex_h = glutGet(GLUT_WINDOW_HEIGHT);
     }
 
+    glUseProgram(_tfShader);
+    assert(glGetError() == GL_NO_ERROR);
+    // set uniform shader variables:
+    glUniform1f(glGetUniformLocation(_tfShader, "branchHeight"), _branchHeight);
+    glUniform1f(glGetUniformLocation(_tfShader, "branchThickness"), _branchThickness);
+    glUniform1f(glGetUniformLocation(_tfShader, "branchUp"), _branchUp);
+
+    /* Set up rendering from vbo_in */
+    glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(0)); // position
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(sizeof(float)*3)); // normal
+
+    /* Set up capturing into vbo_tf */
+    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, _transformFeedback);
+
+    /* Iteratively refine geometry using TF */
+    assert(glGetError() == GL_NO_ERROR);
+    for (int i = 0; i < _steps; i++) {
+        if (_tf_query == 0)
+            glGenQueries(1, &_tf_query);
+        glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, _tf_query);
+        glBeginTransformFeedback(GL_TRIANGLES); // enable TF: geometry is captured in the VBO
+        glEnable(GL_RASTERIZER_DISCARD); // don't rasterize anything while in TF mode
+        glDrawArrays(GL_TRIANGLES, 0, geometryTriangles); // draw the input VBO contents
+        glDisable(GL_RASTERIZER_DISCARD);
+        glEndTransformFeedback();
+        glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
+        glGetQueryObjectuiv(_tf_query, GL_QUERY_RESULT, &geometryTriangles);
+        glCopyBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, GL_ARRAY_BUFFER, 0, 0,
+                            geometryTriangles * sizeof(MyVertex));
+    }
+    assert(glGetError() == GL_NO_ERROR);
+
     // start using shaders:
     glUseProgram(_shader);
-
-    // set uniform shader variables:
+    assert(glGetError() == GL_NO_ERROR);
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "ks"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "shininess"), 5.0f);
@@ -160,76 +156,30 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "r"), 0.2f);
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
-    glUniform1f(glGetUniformLocation(_shader, "branchHeight"), _branchHeight);
-    glUniform1f(glGetUniformLocation(_shader, "branchThickness"), _branchThickness);
-    glUniform1f(glGetUniformLocation(_shader, "branchUp"), _branchUp);
-
-    updateTFB();
-    renderTFB();
 
 //    glutSolidTorus(0.1f, 0.5f, 100, 100);
 //    drawTreeStart();
 
+    glDrawArrays(GL_TRIANGLES, 0, geometryTriangles * 3);
+    assert(glGetError() == GL_NO_ERROR);
+
     // end using shaders:
     glUseProgram(0);
     glutSwapBuffers();
-
-    // http://ogldev.atspace.co.uk/www/tutorial28/tutorial28.html
-}
-
-void Extra::updateTFB()
-{
-    static GLuint tf_query = 0;
-
-    glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(0)); // position
-
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(sizeof(float)*3)); // normal
-
-    glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, _branchBuffer);
-
-    glBufferSubData(GL_ARRAY_BUFFER, 0, 9 * sizeof(MyVertex), _branch);
-
-    for (size_t i = 0; i < _steps; i++) {
-        if (tf_query == 0){
-            glGenQueries(1, &tf_query);
-        }
-        glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, tf_query);
-        glBeginTransformFeedback(GL_TRIANGLES); // enable TF: geometry is captured in the VBO
-        glEnable(GL_RASTERIZER_DISCARD); // don't rasterize anything while in TF mode
-        glDrawArrays(GL_TRIANGLES, 0, _geometryTriangles * 3); // draw the input VBO contents
-        glDisable(GL_RASTERIZER_DISCARD);
-        glEndTransformFeedback();
-        glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
-        glGetQueryObjectuiv(tf_query, GL_QUERY_RESULT, &_geometryTriangles);
-        /* Copy from vbo_tf into vbo_in */
-        glCopyBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, GL_ARRAY_BUFFER, 0, 0,
-                _geometryTriangles * 9 * sizeof(MyVertex));
-    }
-}
-
-void Extra::renderTFB()
-{
-    glUseProgram(0);//TODO use shaders
-    assert(glGetError() == GL_NO_ERROR);
-    glDrawArrays(GL_TRIANGLES, 0, _geometryTriangles * 3);
-    assert(glGetError() == GL_NO_ERROR);
 }
 
 void Extra::initTFB()
 {
-    fillTreeStart(_branch);
+    MyVertex branch[MAX_VERTICES];
+    fillTreeStart(branch);
 
     glGenBuffers(1, &_branchBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * MAX_VERTICES, NULL, GL_DYNAMIC_COPY);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * MAX_VERTICES, branch, GL_DYNAMIC_COPY); // DYN_COPY recommended by Blue Book for TF
 
     glGenBuffers(1, &_transformFeedback);
     glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, _transformFeedback);
-    glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, sizeof(MyVertex) * MAX_VERTICES, NULL, GL_DYNAMIC_COPY);
-
+    glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, sizeof(MyVertex) * MAX_VERTICES, branch, GL_DYNAMIC_COPY);
 }
 
 /* GLUT idle func */
@@ -245,18 +195,6 @@ void Extra::idle()
 void Extra::keyboard(unsigned char key, int x, int y)
 {
     switch (key) {
-    case '0':
-    case '1':
-    case '2':
-    case '3':
-    case '4':
-    case '5':
-    case '6':
-    case '7':
-    case '8':
-    case '9':
-        _steps = key - '0';
-        break;
     case 'f':
         fullscreen = !fullscreen;
         if (fullscreen) {
@@ -305,6 +243,18 @@ void Extra::keyboard(unsigned char key, int x, int y)
         _branchUp += 0.01f;
         if (_branchUp >= 0.2f) _branchUp = 0.19f;
         break;
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+        _steps = key - '0';
+        break;
     }
 }
 
@@ -313,8 +263,12 @@ void Extra::specialInput(int key, int x, int y)
     switch(key)
     {
         case GLUT_KEY_UP:
+        _steps++;
+        if (_steps > MAX_STEPS) _steps = MAX_STEPS;
         break;
         case GLUT_KEY_DOWN:
+        _steps--;
+        if (_steps < 0) _steps = 0;
         break;
         case GLUT_KEY_LEFT:
         break;
@@ -387,16 +341,16 @@ void Extra::normalize (float n[]){
 /* draws trinagle abc with correct normal */
 void Extra::drawTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2){
     float n[3];
-    float ba[3];
-    float bc[3];
+//    float ba[3];
+//    float bc[3];
 
-    ba[0] = a0 - b0;
-    ba[1] = a1 - b1;
-    ba[2] = a2 - b2;
+//    ba[0] = a0 - b0;
+//    ba[1] = a1 - b1;
+//    ba[2] = a2 - b2;
 
-    bc[0] = c0 - b0;
-    bc[1] = c1 - b1;
-    bc[2] = c2 - b2;
+//    bc[0] = c0 - b0;
+//    bc[1] = c1 - b1;
+//    bc[2] = c2 - b2;
 
 //    crossProduct(bc, ba, n);
 //    normalize(n);
@@ -438,23 +392,24 @@ void Extra::drawTreeStart()
     drawTriangle(-sq, b,-sq   ,  n,h+b,n  ,   sq, b, -sq);
 
     glEnd();
+    glColor3f(1.0f, 1.0f, 1.0f);
     //    glEnable(GL_LIGHTING);//TODO remove
 }
 
 Extra::MyVertex* Extra::getTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2)
 {
     float n[3];
-    float ba[3];
-    float bc[3];
+//    float ba[3];
+//    float bc[3];
     MyVertex result[3];
 
-    ba[0] = a0 - b0;
-    ba[1] = a1 - b1;
-    ba[2] = a2 - b2;
+//    ba[0] = a0 - b0;
+//    ba[1] = a1 - b1;
+//    ba[2] = a2 - b2;
 
-    bc[0] = c0 - b0;
-    bc[1] = c1 - b1;
-    bc[2] = c2 - b2;
+//    bc[0] = c0 - b0;
+//    bc[1] = c1 - b1;
+//    bc[2] = c2 - b2;
 
     n[0] = a0;
     n[1] = a1 + 1.f;
@@ -540,21 +495,77 @@ void Extra::initShaders()
     checkShaderCompileStatus(&fragment_shader, "fragment");
 
     _shader = glCreateProgram();
-
     glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT,12);
     glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
     glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
-
     glAttachShader(_shader, vertex_shader);
     glAttachShader(_shader, geometry_shader);
     glAttachShader(_shader, fragment_shader);
-
-    // Define variables that should be captured by TF *before* linking!
-    static const char* varying_names[] = { "gs_pos", "gN" };
-    glTransformFeedbackVaryings(_shader, 2, varying_names, GL_INTERLEAVED_ATTRIBS);
-
     glLinkProgram(_shader);
-    checkShaderLinkStatus(&_shader, "kekse");
+    checkShaderLinkStatus(&_shader, "backend shaders");
+
+    // setup extra geometry shader for transform feedback:
+    GLuint tf_vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(tf_vertex_shader, 1, &tf_vertex_shader_src, NULL);
+    glCompileShader(tf_vertex_shader);
+    checkShaderCompileStatus(&tf_vertex_shader, "tf_vertex");
+
+    // setup extra geometry shader for transform feedback:
+    GLuint tf_geometry_shader = glCreateShader(GL_GEOMETRY_SHADER);
+    glShaderSource(tf_geometry_shader, 1, &tf_geometry_shader_src, NULL);
+    glCompileShader(tf_geometry_shader);
+    checkShaderCompileStatus(&tf_geometry_shader, "tf_geometry");
+
+    _tfShader = glCreateProgram();
+    glProgramParameteriEXT(_tfShader, GL_GEOMETRY_VERTICES_OUT_EXT,12);
+    glProgramParameteriEXT(_tfShader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
+    glProgramParameteriEXT(_tfShader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+    glAttachShader(_tfShader, tf_vertex_shader);
+    glAttachShader(_tfShader, tf_geometry_shader);
+
+    glLinkProgram(_tfShader);
+    checkShaderLinkStatus(&_tfShader, "transform feedback shaders");
+
+    static const char* varying_names[] = { "gs_pos", "gs_normal" };
+    glTransformFeedbackVaryings(_tfShader, 2, varying_names, GL_INTERLEAVED_ATTRIBS);
+    link_program("transform feedback stuff", _tfShader);
+}
+
+void Extra::link_program(const std::string &name, const GLuint prg)
+{
+    glLinkProgram(prg);
+
+    std::string log;
+    GLint e, l;
+    glGetProgramiv(prg, GL_LINK_STATUS, &e);
+    glGetProgramiv(prg, GL_INFO_LOG_LENGTH, &l);
+    if (l > 0) {
+        char *tmplog = new char[l];
+        glGetProgramInfoLog(prg, l, NULL, tmplog);
+        kill_crlf(tmplog);
+        log = std::string(tmplog);
+        delete[] tmplog;
+    } else {
+        log = std::string("");
+    }
+
+    if (e == GL_TRUE && log.length() > 0) {
+        fprintf(stderr, "OpenGL program '%s': linker warning:\n", name.c_str());
+        fprintf(stderr, "%s\n", log.c_str());
+    } else if (e != GL_TRUE) {
+        fprintf(stderr, "OpenGL program '%s': linker error:\n", name.c_str());
+        fprintf(stderr, "%s\n", log.c_str());
+    }
+    assert(e == GL_TRUE);
+}
+
+void Extra::kill_crlf(char *str)
+{
+    size_t l = std::strlen(str);
+    if (l > 0 && str[l - 1] == '\n')
+        str[--l] = '\0';
+    if (l > 0 && str[l - 1] == '\r')
+        str[l - 1] = '\0';
 }
 
 int main(int argc, char *argv[])
@@ -570,6 +581,7 @@ int main(int argc, char *argv[])
     /* Initialize OpenGL extensions */
     glewInit();
 
+    Extra::initShaders();
 
     Extra::_cam = new Camera();
     Extra::_cam->setMaxDistance(SKYBOX_OFFSET / 2.f);
@@ -578,7 +590,6 @@ int main(int argc, char *argv[])
     Extra::_cam->setup();
 
     Extra::initTFB();
-    Extra::initShaders();
 
     /* Start GLUT loop */
     glutDisplayFunc(Extra::display);
@@ -593,4 +604,46 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+bool Extra::checkShaderCompileStatus(GLuint *shader, std::string sh)
+{
+    GLint compiled;
+    glGetObjectParameterivARB(*shader, GL_COMPILE_STATUS, &compiled);
+    if (!compiled)
+    {
+        GLint blen = 0;
+        GLsizei slen = 0;
+        glGetShaderiv(*shader, GL_INFO_LOG_LENGTH , &blen);
+        if (blen > 1){
+            GLchar* compiler_log = (GLchar*)malloc(blen);
+            glGetInfoLogARB(*shader, blen, &slen, compiler_log);
+            std::cout << "Error in " << sh << ", ";
+            std::cout << "compiler_log:\n" << compiler_log;
+            free (compiler_log);
+        }
+        std::cout << std::flush;
+        return false;
+    }
+    return true;
+}
+
+bool Extra::checkShaderLinkStatus(GLuint *shader, std::string sh)
+{
+    GLint compiled;
+    glGetObjectParameterivARB(*shader, GL_LINK_STATUS, &compiled);
+    if (!compiled)
+    {
+        std::cout << "error: " << sh << std::endl;
+        GLint blen = 1024;
+        GLsizei slen = 0;
+        GLchar* compiler_log = (GLchar*)malloc(blen);
+        glGetProgramInfoLog(*shader, blen, &slen, compiler_log);
+
+        std::cout << "compiler_log:\n" << compiler_log;
+        free (compiler_log);
+
+        std::cout << std::flush;
+        return false;
+    }
+    return true;
+}
 

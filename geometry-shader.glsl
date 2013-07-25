@@ -1,33 +1,24 @@
-#version 330
+#version 120
 #extension GL_EXT_geometry_shader4 : enable
-
-precision highp float;
-
-layout (triangles) in;
-layout (triangle_strip, max_vertices = 12) out;
+//#extension GL_EXT_gpu_shader4: enable
 
 /* Variables from the vertex shader */
-in vec3 vN[];   // Normal in eye space, not normalized
-in vec3 vL[];   // Light vector in eye space, not normalized
-in vec3 vV[];   // View vector in eye space, not normalized
+varying in vec3 vN[];   // Normal in eye space, not normalized
+varying in vec3 vL[];   // Light vector in eye space, not normalized
+varying in vec3 vV[];   // View vector in eye space, not normalized
 /* Variables passed to the fragment shader */
-out vec3 gN;    // Normal in eye space, not normalized
-out vec3 gL;    // Light vector in eye space, not normalized
-out vec3 gV;    // View vector in eye space, not normalized
-out vec3 gs_pos; // transform feedback
+varying out vec3 gN;    // Normal in eye space, not normalized
+varying out vec3 gL;    // Light vector in eye space, not normalized
+varying out vec3 gV;    // View vector in eye space, not normalized
 
 uniform float branchHeight;
 uniform float branchThickness;
 uniform float branchUp;
 uniform vec3 light_position;    // Light position in object space
 
-in vec3 vs_color[];
-
 void emit_vertex(vec4 pos, vec3 normal, vec3 light, vec3 view)
 {
-//    gl_Position = gl_ModelViewProjectionMatrix * pos;
-    gl_Position = pos;
-    gs_pos = gl_Position.xyz;
+    gl_Position = gl_ModelViewProjectionMatrix * pos;
     gN = normal;
     gL = light;
     gV = view;
@@ -36,12 +27,9 @@ void emit_vertex(vec4 pos, vec3 normal, vec3 light, vec3 view)
 
 void emit_vertex_auto(vec4 pos, vec3 normal){
     vec3 eye_pos = vec3(0.0); // The eye position in eye space is always (0,0,0)
-//    vec3 light_pos = (gl_ModelViewMatrix * vec4(light_position, 1.0)).xyz;
-    vec3 light_pos = light_position;
+    vec3 light_pos = (gl_ModelViewMatrix * vec4(light_position, 1.0)).xyz;
 
-//    gl_Position = gl_ModelViewProjectionMatrix * pos;
-    gl_Position = pos;
-    gs_pos = gl_Position.xyz;
+    gl_Position = gl_ModelViewProjectionMatrix * pos;
     gN = normal;
     gL = light_pos - pos.xyz;
     gV = eye_pos - pos.xyz;

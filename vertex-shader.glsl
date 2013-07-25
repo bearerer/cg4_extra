@@ -1,39 +1,37 @@
-#version 330
-
-layout (location = 0) in vec3 in_pos;
-layout (location = 1) in vec3 in_normal;
+#version 120
 
 /* Variables for lighting */
 uniform vec3 light_position;    // Light position in object space
 
+attribute vec4 InVertex;  //w will be set to 1.0 automatically
+attribute vec3 InNormal;
+
 /* Variables passed to the fragment shader */
-out vec3 vN;    // Normal in eye space, not normalized
-out vec3 vT;    // Tangent in eye space, not normalized
-out vec3 vB;    // Bitangent in eye space, not normalized
-out vec3 vL;    // Light vector in eye space, not normalized
-out vec3 vV;    // View vector in eye space, not normalized
+varying out vec3 vN;    // Normal in eye space, not normalized
+varying out vec3 vT;    // Tangent in eye space, not normalized
+varying out vec3 vB;    // Bitangent in eye space, not normalized
+varying out vec3 vL;    // Light vector in eye space, not normalized
+varying out vec3 vV;    // View vector in eye space, not normalized
 
 void main(void)
 {
     /* Geometry computation. */
 
     // Transform the vertex:
-    gl_Position = vec4(in_pos, 1.0);
+//    gl_Position = gl_Vertex;
+    gl_Position = InVertex;
 
     /* Lighting computation, in eye space. */
 
     // The position in eye space.
-//    vec3 pos = (gl_ModelViewMatrix * in_pos).xyz;
-    vec3 pos = in_pos;
+    vec3 pos = (gl_ModelViewMatrix * gl_Vertex).xyz;
     // The eye position in eye space is always (0,0,0).
     vec3 eye_pos = vec3(0.0);
     // The light position in eye space.
-//    vec3 light_pos = (gl_ModelViewMatrix * vec4(light_position, 1.0)).xyz;
-    vec3 light_pos = light_position;
+    vec3 light_pos = (gl_ModelViewMatrix * vec4(light_position, 1.0)).xyz;
     // The normal in eye space.
 //    vN = gl_NormalMatrix * gl_Normal;
-//    vN = gl_NormalMatrix * in_normal;
-    vN = in_normal;
+    vN = gl_NormalMatrix * InNormal;
 
     // The tangent in eye space.
     // Note: normally these would be precomputed and stored with the model.

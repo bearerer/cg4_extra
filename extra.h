@@ -5,6 +5,7 @@
 #include "camera.h"
 
 #define MAX_VERTICES 10000
+#define MAX_STEPS 10
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
 class Extra {
@@ -38,25 +39,29 @@ public:
     static void crossProduct(float a[], float b[], float result[]);
     static void initShaders();
     static void initTFB();
+    static void kill_crlf(char *str);
 private:
+    static void link_program(const std::string &name, const GLuint prg);
     static void drawTreeStart();
     static void fillTreeStart(MyVertex branch[]);
     static MyVertex* getTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2);
-    static void updateTFB();
-    static void renderTFB();
 
     static GLuint _shader;
+    static GLuint _tfShader;
     static bool _camRotating, _camZooming;
     static size_t _lightModel;
     static float _branchThickness;
     static float _branchHeight;
     static float _branchUp;
-    static size_t _steps;
-    static GLuint _geometryTriangles;
 
     static GLuint _branchBuffer;
     static GLuint _transformFeedback;
-    static MyVertex _branch[MAX_VERTICES];
+//    static GLint _vertexLoc;
+//    static GLint _normalLoc;
+
+    static size_t _steps;
+    static GLuint _geometry_prg;
+    static GLuint _tf_query;
 };
 
 

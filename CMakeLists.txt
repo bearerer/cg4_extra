@@ -22,6 +22,8 @@ eq_stringify_shaders(SHADERS
     fragment-shader.glsl
     vertex-shader.glsl
     geometry-shader.glsl
+    transformFeedback_geometry.glsl
+    transformFeedback_vertex.glsl
 )
 
 add_executable(extra
@@ -34,6 +36,8 @@ add_executable(extra
     fragment-shader.glsl
     vertex-shader.glsl
     geometry-shader.glsl
+    transformFeedback_geometry.glsl
+    transformFeedback_vertex.glsl
 )
 
 add_definitions(-g)
