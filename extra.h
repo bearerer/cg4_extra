@@ -39,12 +39,11 @@ public:
     static void crossProduct(float a[], float b[], float result[]);
     static void initShaders();
     static void initTFB();
-    static void kill_crlf(char *str);
 private:
-    static void link_program(const std::string &name, const GLuint prg);
     static void drawTreeStart();
     static void fillTreeStart(MyVertex branch[]);
     static MyVertex* getTriangle(float a0, float a1, float a2, float b0, float b1, float b2, float c0, float c1, float c2);
+    static void setSteps(size_t steps);
 
     static GLuint _shader;
     static GLuint _tfShader;
@@ -56,8 +55,6 @@ private:
 
     static GLuint _branchBuffer;
     static GLuint _transformFeedback;
-//    static GLint _vertexLoc;
-//    static GLint _normalLoc;
 
     static size_t _steps;
     static GLuint _geometry_prg;

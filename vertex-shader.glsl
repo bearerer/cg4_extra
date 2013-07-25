@@ -18,8 +18,8 @@ void main(void)
     /* Geometry computation. */
 
     // Transform the vertex:
-//    gl_Position = gl_Vertex;
-    gl_Position = InVertex;
+    gl_Position = gl_Vertex;
+//    gl_Position = InVertex;
 
     /* Lighting computation, in eye space. */
 

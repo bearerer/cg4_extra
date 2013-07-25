@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <cstring>
 #include <math.h>
 
 #include <GL/glew.h>
@@ -116,6 +115,7 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_tfShader, "branchUp"), _branchUp);
 
     /* Set up rendering from vbo_in */
+
     glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(0)); // position
@@ -133,19 +133,22 @@ void Extra::display()
         glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN, _tf_query);
         glBeginTransformFeedback(GL_TRIANGLES); // enable TF: geometry is captured in the VBO
         glEnable(GL_RASTERIZER_DISCARD); // don't rasterize anything while in TF mode
-        glDrawArrays(GL_TRIANGLES, 0, geometryTriangles); // draw the input VBO contents
+        glDrawArrays(GL_TRIANGLES, 0, geometryTriangles * 9); // draw the input VBO contents
         glDisable(GL_RASTERIZER_DISCARD);
         glEndTransformFeedback();
         glEndQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN);
         glGetQueryObjectuiv(_tf_query, GL_QUERY_RESULT, &geometryTriangles);
         glCopyBufferSubData(GL_TRANSFORM_FEEDBACK_BUFFER, GL_ARRAY_BUFFER, 0, 0,
                             geometryTriangles * sizeof(MyVertex));
+        //    glutSolidTorus(0.1f, 0.5f, 100, 100);
+        //    drawTreeStart();
     }
     assert(glGetError() == GL_NO_ERROR);
 
     // start using shaders:
     glUseProgram(_shader);
     assert(glGetError() == GL_NO_ERROR);
+
     glUniform1f(glGetUniformLocation(_shader, "kd"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "ks"), 0.8f);
     glUniform1f(glGetUniformLocation(_shader, "shininess"), 5.0f);
@@ -157,14 +160,20 @@ void Extra::display()
     glUniform1f(glGetUniformLocation(_shader, "a"), 0.75f);
     glUniform1f(glGetUniformLocation(_shader, "b"), 0.25f);
 
-//    glutSolidTorus(0.1f, 0.5f, 100, 100);
-//    drawTreeStart();
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(0)); // position
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(MyVertex), BUFFER_OFFSET(sizeof(float)*3)); // normal
 
     glDrawArrays(GL_TRIANGLES, 0, geometryTriangles * 3);
     assert(glGetError() == GL_NO_ERROR);
 
     // end using shaders:
     glUseProgram(0);
+
+//    glutSolidTorus(0.1f, 0.5f, 100, 100);
+//    drawTreeStart();
+
     glutSwapBuffers();
 }
 
@@ -173,6 +182,8 @@ void Extra::initTFB()
     MyVertex branch[MAX_VERTICES];
     fillTreeStart(branch);
 
+    //    glutSolidTorus(0.1f, 0.5f, 100, 100);
+    //    drawTreeStart();
     glGenBuffers(1, &_branchBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, _branchBuffer);
     glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * MAX_VERTICES, branch, GL_DYNAMIC_COPY); // DYN_COPY recommended by Blue Book for TF
@@ -211,6 +222,8 @@ void Extra::keyboard(unsigned char key, int x, int y)
     case 'p':
     case ' ':
         pause = !pause;
+        //    glutSolidTorus(0.1f, 0.5f, 100, 100);
+        //    drawTreeStart();
         break;
     case 27:
     case 'q':
@@ -244,6 +257,8 @@ void Extra::keyboard(unsigned char key, int x, int y)
         if (_branchUp >= 0.2f) _branchUp = 0.19f;
         break;
     case '0':
+        //    glutSolidTorus(0.1f, 0.5f, 100, 100);
+        //    drawTreeStart();
     case '1':
     case '2':
     case '3':
@@ -253,7 +268,7 @@ void Extra::keyboard(unsigned char key, int x, int y)
     case '7':
     case '8':
     case '9':
-        _steps = key - '0';
+        setSteps(key - '0');
         break;
     }
 }
@@ -263,12 +278,14 @@ void Extra::specialInput(int key, int x, int y)
     switch(key)
     {
         case GLUT_KEY_UP:
-        _steps++;
-        if (_steps > MAX_STEPS) _steps = MAX_STEPS;
+        if (_steps < MAX_STEPS){
+            setSteps(_steps + 1);
+        }
         break;
         case GLUT_KEY_DOWN:
-        _steps--;
-        if (_steps < 0) _steps = 0;
+        if (_steps > 1){
+            setSteps(_steps -1);
+        }
         break;
         case GLUT_KEY_LEFT:
         break;
@@ -447,6 +464,12 @@ Extra::MyVertex* Extra::getTriangle(float a0, float a1, float a2, float b0, floa
     return result;
 }
 
+void Extra::setSteps(size_t steps)
+{
+    _steps = steps;
+    std::cout << "tf loops:" << _steps << std::endl;
+}
+
 void Extra::fillTreeStart(MyVertex branch[])
 {
     float h = 2.f;
@@ -476,6 +499,8 @@ void Extra::initShaders()
 {
     std::cout << "glsl version: " << glGetString(GL_SHADING_LANGUAGE_VERSION) << std::endl;
 
+    static const char* varying_names[] = { "gs_pos", "gs_normal" };
+
     // setup vertex shader:
     GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex_shader, 1, &vertex_shader_src, NULL);
@@ -495,9 +520,9 @@ void Extra::initShaders()
     checkShaderCompileStatus(&fragment_shader, "fragment");
 
     _shader = glCreateProgram();
-    glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT,12);
+    glProgramParameteriEXT(_shader, GL_GEOMETRY_VERTICES_OUT_EXT, 12);
     glProgramParameteriEXT(_shader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
-    glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+    glProgramParameteriEXT(_shader, GL_GEOMETRY_OUTPUT_TYPE_ARB, GL_TRIANGLE_STRIP);
     glAttachShader(_shader, vertex_shader);
     glAttachShader(_shader, geometry_shader);
     glAttachShader(_shader, fragment_shader);
@@ -519,53 +544,15 @@ void Extra::initShaders()
     _tfShader = glCreateProgram();
     glProgramParameteriEXT(_tfShader, GL_GEOMETRY_VERTICES_OUT_EXT,12);
     glProgramParameteriEXT(_tfShader, GL_GEOMETRY_INPUT_TYPE_EXT, GL_TRIANGLES);
-    glProgramParameteriEXT(_tfShader, GL_GEOMETRY_OUTPUT_TYPE_EXT, GL_TRIANGLES);
+    glProgramParameteriEXT(_tfShader, GL_GEOMETRY_OUTPUT_TYPE_ARB, GL_TRIANGLE_STRIP);
     glAttachShader(_tfShader, tf_vertex_shader);
     glAttachShader(_tfShader, tf_geometry_shader);
+    glTransformFeedbackVaryings(_tfShader, 2, varying_names, GL_INTERLEAVED_ATTRIBS);
 
     glLinkProgram(_tfShader);
     checkShaderLinkStatus(&_tfShader, "transform feedback shaders");
 
-    static const char* varying_names[] = { "gs_pos", "gs_normal" };
-    glTransformFeedbackVaryings(_tfShader, 2, varying_names, GL_INTERLEAVED_ATTRIBS);
-    link_program("transform feedback stuff", _tfShader);
-}
-
-void Extra::link_program(const std::string &name, const GLuint prg)
-{
-    glLinkProgram(prg);
-
-    std::string log;
-    GLint e, l;
-    glGetProgramiv(prg, GL_LINK_STATUS, &e);
-    glGetProgramiv(prg, GL_INFO_LOG_LENGTH, &l);
-    if (l > 0) {
-        char *tmplog = new char[l];
-        glGetProgramInfoLog(prg, l, NULL, tmplog);
-        kill_crlf(tmplog);
-        log = std::string(tmplog);
-        delete[] tmplog;
-    } else {
-        log = std::string("");
-    }
-
-    if (e == GL_TRUE && log.length() > 0) {
-        fprintf(stderr, "OpenGL program '%s': linker warning:\n", name.c_str());
-        fprintf(stderr, "%s\n", log.c_str());
-    } else if (e != GL_TRUE) {
-        fprintf(stderr, "OpenGL program '%s': linker error:\n", name.c_str());
-        fprintf(stderr, "%s\n", log.c_str());
-    }
-    assert(e == GL_TRUE);
-}
-
-void Extra::kill_crlf(char *str)
-{
-    size_t l = std::strlen(str);
-    if (l > 0 && str[l - 1] == '\n')
-        str[--l] = '\0';
-    if (l > 0 && str[l - 1] == '\r')
-        str[l - 1] = '\0';
+    assert(glGetError() == GL_NO_ERROR);
 }
 
 int main(int argc, char *argv[])
